@@ -163,7 +163,24 @@
         .all-node {
             background: linear-gradient(45deg, #ccc, #999);
         }
-        
+
+        .zoom-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .zoom-container label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        #zoom-slider {
+            width: 300px;
+            max-width: 80%;
+        }
+
         .legend-color {
             width: 20px;
             height: 20px;
@@ -183,6 +200,11 @@
                 <div class="distance-circle" style="width: 600px; height: 600px;"></div>
                 <div class="distance-circle" style="width: 750px; height: 750px;"></div>
             </div>
+        </div>
+
+        <div class="zoom-container">
+            <label for="zoom-slider">Semantic Zoom: <span id="zoom-value">1.0x</span></label>
+            <input type="range" id="zoom-slider" min="0.5" max="2.0" value="1.0" step="0.1">
         </div>
         
         <div class="legend">
@@ -327,6 +349,9 @@
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
 
+                // Initial positioning
+                updatePositions(1.0);
+
                 // Hide loading
                 document.getElementById('loading').style.display = 'none';
 
@@ -340,10 +365,9 @@
             const node = document.createElement('div');
             node.className = `node ${attraction.category}-node`;
             node.textContent = attraction.name;
+            node.dataset.name = attraction.name; // For matching
 
-            node.style.left = `${attraction.x}%`;
-            node.style.top = `${attraction.y}%`;
-            node.style.transform = 'translate(-50%, -50%)';
+            // Initial position will be set by updatePositions
 
             // Add hover events
             node.addEventListener('mouseenter', (e) => {
@@ -355,6 +379,32 @@
             });
 
             return node;
+        }
+
+        function updatePositions(zoom) {
+            const nodes = document.querySelectorAll('.node');
+            nodes.forEach(node => {
+                const name = node.dataset.name;
+                const attraction = attractions.find(a => a.name === name);
+                if (attraction) {
+                    let x = attraction.x;
+                    let y = attraction.y;
+                    if (attraction.category !== 'center') {
+                        const offsetX = (attraction.x - 50) * zoom;
+                        const offsetY = (attraction.y - 50) * zoom;
+                        x = 50 + offsetX;
+                        y = 50 + offsetY;
+                        x = Math.max(5, Math.min(95, x));
+                        y = Math.max(5, Math.min(95, y));
+                    }
+                    node.style.left = `${x}%`;
+                    node.style.top = `${y}%`;
+                    node.style.transform = 'translate(-50%, -50%)';
+                    // Semantic zoom: adjust font size
+                    const baseSize = attraction.category === 'center' ? 14 : 11;
+                    node.style.fontSize = `${baseSize * Math.sqrt(zoom)}px`;
+                }
+            });
         }
 
         function showTooltip(e, attraction) {
@@ -420,6 +470,16 @@
                     }
                 });
             }
+        });
+
+        // Semantic zoom functionality
+        const zoomSlider = document.getElementById('zoom-slider');
+        const zoomValue = document.getElementById('zoom-value');
+
+        zoomSlider.addEventListener('input', () => {
+            const zoom = parseFloat(zoomSlider.value);
+            zoomValue.textContent = zoom.toFixed(1) + 'x';
+            updatePositions(zoom);
         });
     </script>
 </body>
