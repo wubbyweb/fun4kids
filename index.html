@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Georgetown Attraction Proximity Map</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        
+        .graph-container {
+            position: relative;
+            width: 100%;
+            height: 800px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: radial-gradient(circle at center, #f8f9ff 0%, #e8f0fe 100%);
+            overflow: hidden;
+        }
+        
+        .node {
+            position: absolute;
+            padding: 8px 12px;
+            border-radius: 20px;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-width: 100px;
+            max-width: 150px;
+            line-height: 1.2;
+        }
+        
+        .node:hover {
+            transform: scale(1.1);
+            z-index: 100;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+        }
+        
+        .center-node {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            font-size: 14px;
+            padding: 12px 16px;
+            border: 3px solid #fff;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(238, 90, 36, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(238, 90, 36, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(238, 90, 36, 0); }
+        }
+        
+        .close-node {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        }
+        
+        .medium-node {
+            background: linear-gradient(45deg, #feca57, #ff9ff3);
+        }
+        
+        .far-node {
+            background: linear-gradient(45deg, #a55eea, #26de81);
+        }
+        
+        .very-far-node {
+            background: linear-gradient(45deg, #fd79a8, #fdcb6e);
+        }
+        
+        .distance-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .distance-circle {
+            position: absolute;
+            border: 1px dashed rgba(0,0,0,0.1);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 250px;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .legend {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        .legend-item.filter {
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .legend-item.filter:hover {
+            background-color: rgba(0,0,0,0.1);
+        }
+
+        .legend-item.filter.selected {
+            background-color: rgba(0,0,0,0.2);
+            font-weight: bold;
+        }
+
+        .all-node {
+            background: linear-gradient(45deg, #ccc, #999);
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Georgetown Attraction Proximity Map</h1>
+        <p class="subtitle">Attractions positioned by distance from Bonnet Blvd, Georgetown, TX</p>
+        
+        <div class="graph-container" id="graph">
+            <div class="distance-lines">
+                <div class="distance-circle" style="width: 200px; height: 200px;"></div>
+                <div class="distance-circle" style="width: 400px; height: 400px;"></div>
+                <div class="distance-circle" style="width: 600px; height: 600px;"></div>
+                <div class="distance-circle" style="width: 750px; height: 750px;"></div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item filter" data-category="all">
+                <div class="legend-color all-node"></div>
+                <span>All</span>
+            </div>
+            <div class="legend-item filter" data-category="close">
+                <div class="legend-color close-node"></div>
+                <span>Close (0-15 miles)</span>
+            </div>
+            <div class="legend-item filter" data-category="far">
+                <div class="legend-color far-node"></div>
+                <span>Far (15-35 miles)</span>
+            </div>
+            <div class="legend-item filter" data-category="very-far">
+                <div class="legend-color very-far-node"></div>
+                <span>Very Far (35+ miles)</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip" id="tooltip"></div>
+    <div id="loading" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: #333;">Loading attractions...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script>
+        let attractions = [];
+
+        // Geocode function using Nominatim
+        async function geocode(address) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.length > 0) {
+                    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                }
+            } catch (error) {
+                console.error('Geocoding error for', address, error);
+            }
+            return null;
+        }
+
+        // Haversine distance in miles
+        function haversineDistance(lat1, lng1, lat2, lng2) {
+            const R = 3958.8; // Earth's radius in miles
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // Bearing in degrees
+        function bearing(lat1, lng1, lat2, lng2) {
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const x = Math.sin(dLng) * Math.cos(lat2 * Math.PI / 180);
+            const y = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                      Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLng);
+            const brng = Math.atan2(x, y) * 180 / Math.PI;
+            return (brng + 360) % 360;
+        }
+
+        // Load data and process
+        async function loadData() {
+            try {
+                const response = await fetch('data.csv');
+                const csvText = await response.text();
+                const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+                const data = parsed.data.filter(item => item['Attraction Name']);
+
+                // Geocode center
+                const centerAddress = "751 Bonnet Blvd, Georgetown, TX";
+                const centerLatLng = await geocode(centerAddress);
+                if (!centerLatLng) {
+                    console.error('Failed to geocode center');
+                    document.getElementById('loading').textContent = 'Error: Could not geocode center address';
+                    return;
+                }
+
+                // Add center node immediately
+                const centerAttraction = {
+                    name: "Bonnet Blvd",
+                    address: centerAddress,
+                    description: "Reference Point - Your Location",
+                    distance: 0,
+                    direction: 0,
+                    x: 50,
+                    y: 50,
+                    category: "center"
+                };
+                attractions.push(centerAttraction);
+                const graph = document.getElementById('graph');
+                graph.appendChild(createNode(centerAttraction));
+
+                // Update loading text
+                document.getElementById('loading').textContent = 'Loading attractions...';
+
+                // Track max distance for scaling
+                let maxDist = 50;
+
+                // Geocode attractions one by one
+                for (const item of data) {
+                    const addr = item.Address || item.address;
+                    if (!addr || addr === 'Austin, TX') continue; // Skip vague addresses
+                    const latLng = await geocode(addr);
+                    if (latLng) {
+                        const dist = haversineDistance(centerLatLng.lat, centerLatLng.lng, latLng.lat, latLng.lng);
+                        const brng = bearing(centerLatLng.lat, centerLatLng.lng, latLng.lat, latLng.lng);
+
+                        // Update maxDist
+                        if (dist > maxDist) maxDist = dist;
+
+                        let category = "very-far";
+                        if (dist <= 15) category = "close";
+                        else if (dist <= 35) category = "far";
+
+                        const angle = (brng - 90) * Math.PI / 180; // North is top
+                        const distRatio = dist / maxDist;
+                        const radius = 35; // percentage
+                        const x = 50 + distRatio * radius * Math.cos(angle);
+                        const y = 50 + distRatio * radius * Math.sin(angle);
+
+                        const attraction = {
+                            name: item['Attraction Name'],
+                            address: addr,
+                            description: item.Description,
+                            distance: Math.round(dist * 10) / 10,
+                            direction: brng,
+                            x: Math.max(5, Math.min(95, x)),
+                            y: Math.max(5, Math.min(95, y)),
+                            category
+                        };
+
+                        attractions.push(attraction);
+                        graph.appendChild(createNode(attraction));
+                    }
+                    // Delay to avoid rate limits
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('loading').textContent = 'Error loading data';
+            }
+        }
+
+        function createNode(attraction) {
+            const node = document.createElement('div');
+            node.className = `node ${attraction.category}-node`;
+            node.textContent = attraction.name;
+
+            node.style.left = `${attraction.x}%`;
+            node.style.top = `${attraction.y}%`;
+            node.style.transform = 'translate(-50%, -50%)';
+
+            // Add hover events
+            node.addEventListener('mouseenter', (e) => {
+                showTooltip(e, attraction);
+            });
+
+            node.addEventListener('mouseleave', () => {
+                hideTooltip();
+            });
+
+            return node;
+        }
+
+        function showTooltip(e, attraction) {
+            const tooltip = document.getElementById('tooltip');
+            const directionName = getDirectionName(attraction.direction);
+            tooltip.innerHTML = `
+                <strong>${attraction.name}</strong><br>
+                <em>${attraction.address}</em><br>
+                Distance: ${attraction.distance} miles ${directionName}<br>
+                ${attraction.description}
+            `;
+
+            tooltip.style.left = e.pageX + 10 + 'px';
+            tooltip.style.top = e.pageY - 10 + 'px';
+            tooltip.style.opacity = '1';
+        }
+
+        function getDirectionName(degrees) {
+            const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+            const index = Math.round(degrees / 45) % 8;
+            return directions[index];
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.opacity = '0';
+        }
+
+        // Update tooltip position on mouse move
+        document.addEventListener('mousemove', (e) => {
+            const tooltip = document.getElementById('tooltip');
+            if (tooltip.style.opacity === '1') {
+                tooltip.style.left = e.pageX + 10 + 'px';
+                tooltip.style.top = e.pageY - 10 + 'px';
+            }
+        });
+
+        // Load data on page load
+        window.addEventListener('load', () => {
+            loadData().then(() => {
+                // Set 'all' as selected by default
+                document.querySelector('.legend-item[data-category="all"]').classList.add('selected');
+            });
+        });
+
+        // Filter functionality
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.legend-item.filter')) {
+                const item = e.target.closest('.legend-item.filter');
+                const category = item.dataset.category;
+
+                // Remove selected from all
+                document.querySelectorAll('.legend-item.filter').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+
+                // Filter nodes
+                const nodes = document.querySelectorAll('.node');
+                nodes.forEach(node => {
+                    if (category === 'all' || node.classList.contains('center-node') || node.classList.contains(`${category}-node`)) {
+                        node.style.display = 'block';
+                    } else {
+                        node.style.display = 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
